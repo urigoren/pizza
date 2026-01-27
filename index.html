@@ -72,7 +72,7 @@
         const ctx = canvas.getContext('2d');
         const drawButton = document.getElementById('drawButton');
 
-        function drawWavyLine(x1, y1, x2, y2, amplitude, frequency, color) {
+        function drawWavyLine(x1, y1, x2, y2, amplitude, frequency, color, phase_shift) {
             ctx.fillStyle = color;
             const dx = x2 - x1;
             const dy = y2 - y1;
@@ -93,7 +93,7 @@
                 const distFromCenter = t * distance;
 
                 // Calculate the sine wave offset
-                const offset = amplitude * distFromCenter/100 * Math.sin(frequency * distFromCenter);
+                const offset = amplitude * distFromCenter/100 * Math.sin(frequency * distFromCenter + phase_shift);
 
                 // Apply the offset along the normal vector
                 const wavyX = x + offset * nx;
@@ -145,8 +145,8 @@
                 ctx.fill();
 
                 // Draw the borders using the custom line function
-                drawWavyLine(0, 0, p1x, p1y, amplitude, frequency, strokeColor);
-                drawWavyLine(0, 0, p2x, p2y, amplitude, frequency, strokeColor);
+                drawWavyLine(0, 0, p1x, p1y, amplitude, frequency, strokeColor, 0);
+                drawWavyLine(0, 0, p2x, p2y, amplitude, frequency, strokeColor, 0);
             }
 
             // Reset transformation for next draw
