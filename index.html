@@ -93,7 +93,7 @@
                 const distFromCenter = t * distance;
 
                 // Calculate the sine wave offset
-                const offset = amplitude * Math.sin(frequency * distFromCenter);
+                const offset = amplitude * distFromCenter/100 * Math.sin(frequency * distFromCenter);
 
                 // Apply the offset along the normal vector
                 const wavyX = x + offset * nx;
