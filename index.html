@@ -43,9 +43,19 @@
                     <label for="rotation" class="form-label">Rotation (degrees):</label>
                     <input type="number" class="form-control" id="rotation" value="0">
                 </div>
-                <div class="mb-3">
-                    <label for="color" class="form-label">Color:</label>
-                    <input type="color" class="form-control form-control-color" id="color" value="#FFD700">
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label for="color" class="form-label">Fill Color</label>
+                        <input type="color" class="form-control form-control-color" id="color" value="#FFD700">
+                    </div>
+                    <div class="col-md-4">
+                        <label for="lineColor" class="form-label">Line Color</label>
+                        <input type="color" class="form-control form-control-color" id="lineColor" value="#333333">
+                    </div>
+                    <div class="col-md-4">
+                        <label for="canvasColor" class="form-label">Canvas Color</label>
+                        <input type="color" class="form-control form-control-color" id="canvasColor" value="#FFFFFF">
+                    </div>
                 </div>
                 <div class="mb-3">
                     <label for="amplitude" class="form-label">Amplitude:</label>
@@ -116,8 +126,13 @@
             const numTriangles = parseInt(document.getElementById('numTriangles').value);
             const rotation = parseFloat(document.getElementById('rotation').value);
             const color = document.getElementById('color').value;
+            const lineColor = document.getElementById('lineColor').value;
+            const canvasColor = document.getElementById('canvasColor').value;
             const amplitude = parseFloat(document.getElementById('amplitude').value);
             const frequency = parseFloat(document.getElementById('frequency').value);
+
+            // Set canvas background color
+            canvas.style.backgroundColor = canvasColor;
 
             // Clear canvas
             ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -128,7 +143,6 @@
             ctx.translate(centerX, centerY);
 
             const radius = Math.min(centerX, centerY) * 0.9; // Max radius
-            const strokeColor = '#333';
 
             // Convert rotation to radians
             const initialRotationRad = (rotation * Math.PI) / 180;
@@ -150,8 +164,8 @@
                 ctx.fillStyle = color;
                 ctx.fill();
 
-                drawWavyLine(0, 0, p1x, p1y, amplitude, frequency, strokeColor, phaseShift);
-                drawWavyLine(0, 0, p2x, p2y, amplitude, frequency, strokeColor, phaseShift);
+                drawWavyLine(0, 0, p1x, p1y, amplitude, frequency, lineColor, phaseShift);
+                drawWavyLine(0, 0, p2x, p2y, amplitude, frequency, lineColor, phaseShift);
             }
 
             ctx.setTransform(1, 0, 0, 1, 0, 0);
