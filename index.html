@@ -55,7 +55,11 @@
                     <label for="frequency" class="form-label">Frequency:</label>
                     <input type="number" class="form-control" id="frequency" value="0.1" step="0.01">
                 </div>
-                <button id="drawButton" class="btn btn-primary w-100">Draw Pizza</button>
+                 <div class="mb-3">
+                    <label for="rate" class="form-label">Rate (seconds for full cycle):</label>
+                    <input type="number" class="form-control" id="rate" value="10" min="1">
+                </div>
+                <button id="drawButton" class="btn btn-primary w-100">Animate</button>
             </div>
 
             <!-- Right-hand side: Canvas -->
@@ -72,12 +76,17 @@
         const ctx = canvas.getContext('2d');
         const drawButton = document.getElementById('drawButton');
 
-        function drawWavyLine(x1, y1, x2, y2, amplitude, frequency, color, phase_shift) {
+        let animationFrameId = null;
+        let startTime = 0;
+
+        function drawWavyLine(x1, y1, x2, y2, amplitude, frequency, color, phaseShift) {
             ctx.fillStyle = color;
             const dx = x2 - x1;
             const dy = y2 - y1;
             const distance = Math.sqrt(dx * dx + dy * dy);
-            const steps = distance; // Number of points to draw
+            if (distance === 0) return;
+
+            const steps = Math.max(1, Math.floor(distance)); // At least 1 step
 
             // Normal vector (perpendicular to the line)
             const nx = -dy / distance;
@@ -93,7 +102,7 @@
                 const distFromCenter = t * distance;
 
                 // Calculate the sine wave offset
-                const offset = amplitude * distFromCenter/100 * Math.sin(frequency * distFromCenter + phase_shift);
+                const offset = amplitude * Math.sin(frequency * distFromCenter + phaseShift);
 
                 // Apply the offset along the normal vector
                 const wavyX = x + offset * nx;
@@ -103,8 +112,7 @@
             }
         }
 
-
-        function drawPizza() {
+        function drawPizza(phaseShift = 0) {
             const numTriangles = parseInt(document.getElementById('numTriangles').value);
             const rotation = parseFloat(document.getElementById('rotation').value);
             const color = document.getElementById('color').value;
@@ -119,7 +127,7 @@
             const centerY = canvas.height / 2;
             ctx.translate(centerX, centerY);
 
-            const radius = Math.min(centerX, centerY) * 0.9; // Max radius for the "pizza"
+            const radius = Math.min(centerX, centerY) * 0.9; // Max radius
             const strokeColor = '#333';
 
             // Convert rotation to radians
@@ -130,13 +138,11 @@
                 const startAngle = angle + initialRotationRad;
                 const endAngle = ((i + 1) * 2 * Math.PI) / numTriangles + initialRotationRad;
 
-                // Calculate triangle vertices
                 const p1x = radius * Math.cos(startAngle);
                 const p1y = radius * Math.sin(startAngle);
                 const p2x = radius * Math.cos(endAngle);
                 const p2y = radius * Math.sin(endAngle);
 
-                // Fill the slice using a path
                 ctx.beginPath();
                 ctx.moveTo(0, 0);
                 ctx.arc(0, 0, radius, startAngle, endAngle);
@@ -144,18 +150,38 @@
                 ctx.fillStyle = color;
                 ctx.fill();
 
-                // Draw the borders using the custom line function
-                drawWavyLine(0, 0, p1x, p1y, amplitude, frequency, strokeColor, 0);
-                drawWavyLine(0, 0, p2x, p2y, amplitude, frequency, strokeColor, 0);
+                drawWavyLine(0, 0, p1x, p1y, amplitude, frequency, strokeColor, phaseShift);
+                drawWavyLine(0, 0, p2x, p2y, amplitude, frequency, strokeColor, phaseShift);
             }
 
-            // Reset transformation for next draw
             ctx.setTransform(1, 0, 0, 1, 0, 0);
         }
 
-        // Initial draw and event listener
-        drawButton.addEventListener('click', drawPizza);
-        drawPizza(); // Draw on page load
+        function animate(currentTime) {
+            const rate = parseFloat(document.getElementById('rate').value);
+            const elapsedTime = currentTime - startTime;
+
+            // Calculate phase shift
+            // (2 * PI) is a full circle. We get there in 'rate' seconds.
+            const cycleDurationMs = rate * 1000;
+            const phaseShift = (elapsedTime / cycleDurationMs) * 2 * Math.PI;
+
+            drawPizza(phaseShift);
+
+            animationFrameId = requestAnimationFrame(animate);
+        }
+
+        function startAnimation() {
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+            }
+            startTime = performance.now();
+            animate(startTime);
+        }
+
+        // Event listener and initial draw
+        drawButton.addEventListener('click', startAnimation);
+        drawPizza(); // Draw initial static image on page load
     </script>
 </body>
 </html>
