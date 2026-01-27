@@ -49,7 +49,7 @@
                 </div>
                 <div class="mb-3">
                     <label for="amplitude" class="form-label">Amplitude:</label>
-                    <input type="number" class="form-control" id="amplitude" value="10" step="1">
+                    <input type="number" class="form-control" id="amplitude" value="100" step="1">
                 </div>
                 <div class="mb-3">
                     <label for="frequency" class="form-label">Frequency:</label>
@@ -102,7 +102,7 @@
                 const distFromCenter = t * distance;
 
                 // Calculate the sine wave offset
-                const offset = amplitude * Math.sin(frequency * distFromCenter + phaseShift);
+                const offset = amplitude*distFromCenter/canvas.width * Math.sin(frequency * distFromCenter + phaseShift);
 
                 // Apply the offset along the normal vector
                 const wavyX = x + offset * nx;
