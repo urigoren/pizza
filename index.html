@@ -64,6 +64,34 @@
         const ctx = canvas.getContext('2d');
         const drawButton = document.getElementById('drawButton');
 
+        function drawLine(x1, y1, x2, y2, color) {
+            ctx.fillStyle = color;
+            const dx = x2 - x1;
+            const dy = y2 - y1;
+
+            if (Math.abs(dx) > Math.abs(dy)) { // Line is more horizontal
+                const a = dy / dx;
+                const b = y1 - a * x1;
+                const startX = Math.min(x1, x2);
+                const endX = Math.max(x1, x2);
+
+                for (let x = startX; x <= endX; x++) {
+                    const y = a * x + b;
+                    ctx.fillRect(x, y, 1, 1);
+                }
+            } else { // Line is more vertical
+                const a = dx / dy;
+                const b = x1 - a * y1;
+                const startY = Math.min(y1, y2);
+                const endY = Math.max(y1, y2);
+
+                for (let y = startY; y <= endY; y++) {
+                    const x = a * y + b;
+                    ctx.fillRect(x, y, 1, 1);
+                }
+            }
+        }
+
         function drawPizza() {
             const numTriangles = parseInt(document.getElementById('numTriangles').value);
             const rotation = parseFloat(document.getElementById('rotation').value);
@@ -78,6 +106,7 @@
             ctx.translate(centerX, centerY);
 
             const radius = Math.min(centerX, centerY) * 0.9; // Max radius for the "pizza"
+            const strokeColor = '#333';
 
             // Convert rotation to radians
             const initialRotationRad = (rotation * Math.PI) / 180;
@@ -87,18 +116,23 @@
                 const startAngle = angle + initialRotationRad;
                 const endAngle = ((i + 1) * 2 * Math.PI) / numTriangles + initialRotationRad;
 
-                ctx.beginPath();
-                ctx.moveTo(0, 0); // Move to center (origin)
-                ctx.lineTo(radius * Math.cos(startAngle), radius * Math.sin(startAngle));
-                ctx.arc(0, 0, radius, startAngle, endAngle);
-                ctx.lineTo(0, 0); // Back to center
-                ctx.closePath();
+                // Calculate triangle vertices
+                const p1x = radius * Math.cos(startAngle);
+                const p1y = radius * Math.sin(startAngle);
+                const p2x = radius * Math.cos(endAngle);
+                const p2y = radius * Math.sin(endAngle);
 
+                // Fill the slice using a path
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.arc(0, 0, radius, startAngle, endAngle);
+                ctx.closePath();
                 ctx.fillStyle = color;
                 ctx.fill();
-                ctx.strokeStyle = '#333'; // Darker stroke for separation
-                ctx.lineWidth = 1;
-                ctx.stroke();
+
+                // Draw the borders using the custom line function
+                drawLine(0, 0, p1x, p1y, strokeColor);
+                drawLine(0, 0, p2x, p2y, strokeColor);
             }
 
             // Reset transformation for next draw
