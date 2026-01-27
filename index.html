@@ -47,6 +47,14 @@
                     <label for="color" class="form-label">Color:</label>
                     <input type="color" class="form-control form-control-color" id="color" value="#FFD700">
                 </div>
+                <div class="mb-3">
+                    <label for="amplitude" class="form-label">Amplitude:</label>
+                    <input type="number" class="form-control" id="amplitude" value="10" step="1">
+                </div>
+                <div class="mb-3">
+                    <label for="frequency" class="form-label">Frequency:</label>
+                    <input type="number" class="form-control" id="frequency" value="0.1" step="0.01">
+                </div>
                 <button id="drawButton" class="btn btn-primary w-100">Draw Pizza</button>
             </div>
 
@@ -64,38 +72,44 @@
         const ctx = canvas.getContext('2d');
         const drawButton = document.getElementById('drawButton');
 
-        function drawLine(x1, y1, x2, y2, color) {
+        function drawWavyLine(x1, y1, x2, y2, amplitude, frequency, color) {
             ctx.fillStyle = color;
             const dx = x2 - x1;
             const dy = y2 - y1;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const steps = distance; // Number of points to draw
 
-            if (Math.abs(dx) > Math.abs(dy)) { // Line is more horizontal
-                const a = dy / dx;
-                const b = y1 - a * x1;
-                const startX = Math.min(x1, x2);
-                const endX = Math.max(x1, x2);
+            // Normal vector (perpendicular to the line)
+            const nx = -dy / distance;
+            const ny = dx / distance;
 
-                for (let x = startX; x <= endX; x++) {
-                    const y = a * x + b;
-                    ctx.fillRect(x, y, 1, 1);
-                }
-            } else { // Line is more vertical
-                const a = dx / dy;
-                const b = x1 - a * y1;
-                const startY = Math.min(y1, y2);
-                const endY = Math.max(y1, y2);
+            for (let i = 0; i <= steps; i++) {
+                const t = i / steps;
+                // Point on the straight line
+                const x = x1 + t * dx;
+                const y = y1 + t * dy;
 
-                for (let y = startY; y <= endY; y++) {
-                    const x = a * y + b;
-                    ctx.fillRect(x, y, 1, 1);
-                }
+                // Distance from the center (origin of the line)
+                const distFromCenter = t * distance;
+
+                // Calculate the sine wave offset
+                const offset = amplitude * Math.sin(frequency * distFromCenter);
+
+                // Apply the offset along the normal vector
+                const wavyX = x + offset * nx;
+                const wavyY = y + offset * ny;
+
+                ctx.fillRect(wavyX, wavyY, 1, 1);
             }
         }
+
 
         function drawPizza() {
             const numTriangles = parseInt(document.getElementById('numTriangles').value);
             const rotation = parseFloat(document.getElementById('rotation').value);
             const color = document.getElementById('color').value;
+            const amplitude = parseFloat(document.getElementById('amplitude').value);
+            const frequency = parseFloat(document.getElementById('frequency').value);
 
             // Clear canvas
             ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -131,8 +145,8 @@
                 ctx.fill();
 
                 // Draw the borders using the custom line function
-                drawLine(0, 0, p1x, p1y, strokeColor);
-                drawLine(0, 0, p2x, p2y, strokeColor);
+                drawWavyLine(0, 0, p1x, p1y, amplitude, frequency, strokeColor);
+                drawWavyLine(0, 0, p2x, p2y, amplitude, frequency, strokeColor);
             }
 
             // Reset transformation for next draw
