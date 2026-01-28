@@ -3,27 +3,34 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Braun Hallucination (Canvas)</title>
+  <title>Pizza + Dancing Triangles (actually visible)</title>
   <style>
-    html, body { margin:0; height:100%; background:#050507; overflow:hidden; }
-    canvas { display:block; width:100vw; height:100vh; }
+    html, body { margin:0; height:100%; background:#000; overflow:hidden; }
+    canvas { display:block; width:100vw; height:100vh; background:#000; }
     .hint {
       position: fixed; left: 12px; bottom: 12px;
-      font: 12px/1.2 system-ui, sans-serif; color: rgba(255,255,255,.65);
+      font: 12px/1.2 system-ui, sans-serif; color: rgba(255,255,255,.7);
       user-select: none;
     }
   </style>
 </head>
 <body>
   <canvas id="c"></canvas>
-  <div class="hint">Space = pause • R = reset • Click = new seed</div>
+  <div class="hint">Space = pause • R / Click = reseed</div>
 
 <script>
-(() => {
-  const canvas = document.getElementById('c');
-  const ctx = canvas.getContext('2d');
+(function () {
+  var canvas = document.getElementById('c');
+  var ctx = canvas.getContext('2d');
 
-  let W = 0, H = 0, DPR = 1;
+  if (!ctx) {
+    // If this happens, your browser is basically a fossil.
+    document.body.innerHTML = '<div style="color:#fff;font:16px system-ui;padding:16px">No 2D canvas context available.</div>';
+    return;
+  }
+
+  var W=0, H=0, DPR=1;
+
   function resize() {
     DPR = Math.min(2, window.devicePixelRatio || 1);
     W = Math.floor(window.innerWidth * DPR);
@@ -34,231 +41,245 @@
   window.addEventListener('resize', resize);
   resize();
 
-  // ---- deterministic-ish randomness (seeded) ----
-  let seed = (Math.random() * 1e9) | 0;
+  // Seeded RNG
+  var seed = (Math.random() * 1e9) | 0;
   function rnd() {
-    // xorshift32
     seed ^= seed << 13; seed |= 0;
     seed ^= seed >> 17; seed |= 0;
     seed ^= seed << 5;  seed |= 0;
     return ((seed >>> 0) / 4294967296);
   }
-  function rand(a, b) { return a + (b - a) * rnd(); }
+  function rand(a,b){ return a + (b-a)*rnd(); }
+  function clamp(x,a,b){ return Math.max(a, Math.min(b, x)); }
+  function lerp(a,b,t){ return a + (b-a)*t; }
 
-  // ---- "music" without audio: beat + wobble ----
-  // A fake kick/snare feel: a beat phase and pulses with exponential decay.
-  const BPM = 118; // glam-ish. close enough.
-  const beatHz = BPM / 60;
+  // Fake beat pulse
+  var BPM = 122;
+  var beatHz = BPM / 60;
   function beatPulse(t) {
-    // pulse every beat, with exponential decay
-    const phase = (t * beatHz) % 1; // 0..1
-    const kick = Math.exp(-phase * 8.0);      // quick decay
-    const snare = Math.exp(-((phase - 0.5) * (phase - 0.5)) * 40.0); // mid hit
-    return 0.9 * kick + 0.6 * snare;
+    var ph = (t * beatHz) % 1;                // 0..1
+    var kick = Math.exp(-ph * 10.0);
+    var sn   = Math.exp(-Math.pow(ph - 0.52, 2) * 90.0);
+    var hat  = Math.exp(-Math.pow(ph - 0.25, 2) * 180.0) + Math.exp(-Math.pow(ph - 0.75, 2) * 180.0);
+    return clamp(0.95*kick + 0.55*sn + 0.20*hat, 0, 1.35);
   }
 
-  // ---- dancing "figures" (abstract blobs/lines) ----
-  const dancers = Array.from({length: 48}, () => ({
-    x0: rand(0.15, 0.85),
-    y0: rand(0.15, 0.85),
-    r:  rand(6, 22),
-    f1: rand(0.6, 2.2),
-    f2: rand(0.6, 2.2),
-    p:  rand(0, Math.PI * 2),
-  }));
+  // Pizza slice
+  function drawPizzaSlice(cx, cy, R, aMid, wedge, pulse, alpha) {
+    var a0 = aMid - wedge*0.5;
+    var a1 = aMid + wedge*0.5;
 
-  // ---- pizza triangles ----
-  function drawPizzaTriangle(cx, cy, r, a0, a1, blur, alpha) {
+    // Tip point slightly away from center
+    var tipR = R * 0.08;
+    var tipX = cx + Math.cos(aMid) * tipR;
+    var tipY = cy + Math.sin(aMid) * tipR;
+
+    var p0x = cx + Math.cos(a0)*R;
+    var p0y = cy + Math.sin(a0)*R;
+    var p1x = cx + Math.cos(a1)*R;
+    var p1y = cy + Math.sin(a1)*R;
+
     ctx.save();
     ctx.globalAlpha = alpha;
 
-    // blurry border feel
-    ctx.shadowBlur = blur;
-    ctx.shadowColor = 'rgba(255, 220, 150, 0.55)';
-
-    // gradient fill
-    const grad = ctx.createRadialGradient(cx, cy, r * 0.05, cx, cy, r);
-    grad.addColorStop(0, 'rgba(255, 220, 160, 0.95)');
-    grad.addColorStop(0.55, 'rgba(240, 160, 120, 0.75)');
-    grad.addColorStop(1, 'rgba(120, 60, 40, 0.15)');
-    ctx.fillStyle = grad;
+    // Cheese fill
+    var g = ctx.createRadialGradient(
+      lerp(tipX, cx, 0.35),
+      lerp(tipY, cy, 0.35),
+      R*0.03,
+      cx, cy, R*1.1
+    );
+    g.addColorStop(0.00, 'rgba(255, 240, 190, 1.00)');
+    g.addColorStop(0.60, 'rgba(250, 200, 120, 0.95)');
+    g.addColorStop(1.00, 'rgba(180, 90, 55, 0.55)');
+    ctx.fillStyle = g;
 
     ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.arc(cx, cy, r, a0, a1);
+    ctx.moveTo(tipX, tipY);
+    ctx.lineTo(p0x, p0y);
+    ctx.arc(cx, cy, R, a0, a1);
     ctx.closePath();
     ctx.fill();
 
-    // crust-ish edge
-    ctx.shadowBlur = blur * 0.6;
-    ctx.strokeStyle = 'rgba(255, 180, 90, 0.35)';
-    ctx.lineWidth = Math.max(1, r * 0.02);
+    // Sauce near tip
+    ctx.globalAlpha = alpha * 0.55;
+    ctx.fillStyle = 'rgba(210, 60, 45, 0.75)';
+    ctx.beginPath();
+    ctx.moveTo(tipX, tipY);
+    ctx.lineTo(cx + Math.cos(a0)*R*0.55, cy + Math.sin(a0)*R*0.55);
+    ctx.lineTo(cx + Math.cos(a1)*R*0.55, cy + Math.sin(a1)*R*0.55);
+    ctx.closePath();
+    ctx.fill();
+
+    // Crust arc (this is what makes it unmistakably “pizza”)
+    ctx.globalAlpha = alpha * (0.85 + 0.35*pulse);
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = 'rgba(210, 140, 70, 0.95)';
+    ctx.lineWidth = (R * 0.13) * (0.9 + 0.15*pulse);
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, a0, a1);
+    ctx.stroke();
+
+    // Pepperoni
+    ctx.globalAlpha = alpha * (0.55 + 0.25*pulse);
+    for (var i=0;i<4;i++){
+      var t = (i+1)/5;
+      var rr = R * (0.06 + 0.01*rnd());
+      var px = lerp(tipX, cx + Math.cos(aMid)*R*0.78, t) + (rnd()-0.5)*R*0.08;
+      var py = lerp(tipY, cy + Math.sin(aMid)*R*0.78, t) + (rnd()-0.5)*R*0.08;
+
+      // keep inside wedge by pulling angle toward aMid
+      var ang = Math.atan2(py-cy, px-cx);
+      var off = clamp(ang - aMid, -wedge*0.30, wedge*0.30);
+      var rad = Math.hypot(px-cx, py-cy);
+      px = cx + Math.cos(aMid + off) * rad;
+      py = cy + Math.sin(aMid + off) * rad;
+
+      ctx.fillStyle = 'rgba(165, 35, 35, 0.90)';
+      ctx.beginPath();
+      ctx.ellipse(px, py, rr*1.1, rr, rand(-0.4,0.4), 0, Math.PI*2);
+      ctx.fill();
+
+      ctx.fillStyle = 'rgba(255, 210, 200, 0.20)';
+      ctx.beginPath();
+      ctx.ellipse(px-rr*0.15, py-rr*0.12, rr*0.55, rr*0.45, 0, 0, Math.PI*2);
+      ctx.fill();
+    }
+
+    ctx.restore();
+  }
+
+  // Dancing triangle “characters”
+  var dancers = [];
+  for (var i=0;i<40;i++){
+    dancers.push({
+      x: rand(0.10, 0.90),
+      y: rand(0.22, 0.88),
+      size: rand(18, 54),
+      phase: rand(0, Math.PI*2),
+      sway: rand(0.8, 2.2),
+      hop:  rand(0.9, 2.8),
+      mood: rand(0, 1)
+    });
+  }
+
+  function drawDancer(x,y,sz,t,pulse,mood){
+    var bounce = (0.7 + 1.0*pulse) * Math.abs(Math.sin(t*3.1 + mood*6.0));
+    var rot = 0.55*Math.sin(t*1.2 + mood*5.0) + 0.25*Math.sin(t*2.1 + mood*9.0);
+
+    ctx.save();
+    ctx.translate(x, y - bounce*sz*0.22);
+    ctx.rotate(rot);
+
+    // Body gradient so it reads as a “thing”
+    var g = ctx.createLinearGradient(0, -sz, 0, sz);
+    g.addColorStop(0, 'rgba(200, 255, 255, 0.95)');
+    g.addColorStop(1, 'rgba(120, 190, 255, 0.55)');
+    ctx.fillStyle = g;
+
+    // Triangle
+    ctx.beginPath();
+    ctx.moveTo(0, -sz*0.70);
+    ctx.lineTo(-sz*0.65, sz*0.55);
+    ctx.lineTo(sz*0.65, sz*0.55);
+    ctx.closePath();
+    ctx.fill();
+
+    // Outline
+    ctx.globalAlpha = 0.65;
+    ctx.strokeStyle = 'rgba(255,255,255,0.75)';
+    ctx.lineWidth = Math.max(1, 1.2*DPR);
+    ctx.stroke();
+
+    // Eyes
+    ctx.globalAlpha = 0.55;
+    ctx.fillStyle = 'rgba(20, 30, 40, 0.65)';
+    ctx.beginPath(); ctx.arc(-sz*0.15, -sz*0.05, Math.max(1.2, sz*0.05)*DPR, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc( sz*0.15, -sz*0.05, Math.max(1.2, sz*0.05)*DPR, 0, Math.PI*2); ctx.fill();
+
+    // Legs stepping
+    var step = 0.55*Math.sin(t*4.0 + mood*8.0);
+    var legLen = sz*0.55*(0.85 + 0.35*pulse);
+
+    ctx.globalAlpha = 0.7;
+    ctx.strokeStyle = 'rgba(255,255,255,0.65)';
+    ctx.lineWidth = Math.max(1, 1.1*DPR);
+    ctx.lineCap = 'round';
+
+    ctx.beginPath();
+    ctx.moveTo(-sz*0.15, sz*0.55);
+    ctx.lineTo(-sz*0.15 + step*sz*0.22, sz*0.55 + legLen);
+    ctx.moveTo( sz*0.15, sz*0.55);
+    ctx.lineTo( sz*0.15 - step*sz*0.22, sz*0.55 + legLen);
     ctx.stroke();
 
     ctx.restore();
   }
 
-  // ---- "singer" silhouette + headband flicker illusion ----
-  function drawSinger(t, flickerOn) {
-    const cx = W * 0.5;
-    const cy = H * 0.58;
-    const pulse = beatPulse(t);
-
-    ctx.save();
-    ctx.globalAlpha = 0.65;
-
-    // body
-    ctx.fillStyle = 'rgba(180, 180, 255, 0.10)';
-    ctx.beginPath();
-    ctx.ellipse(cx, cy + H*0.06, W*0.06*(1+0.05*pulse), H*0.12*(1+0.06*pulse), 0, 0, Math.PI*2);
-    ctx.fill();
-
-    // head
-    ctx.fillStyle = 'rgba(220, 220, 255, 0.12)';
-    ctx.beginPath();
-    ctx.ellipse(cx, cy - H*0.05, W*0.03, H*0.04, 0, 0, Math.PI*2);
-    ctx.fill();
-
-    // hair blob
-    ctx.fillStyle = 'rgba(255, 180, 220, 0.10)';
-    ctx.beginPath();
-    ctx.ellipse(cx, cy - H*0.065, W*0.042, H*0.05, 0.15*Math.sin(t*0.7), 0, Math.PI*2);
-    ctx.fill();
-
-    // the "headband" that isn't there
-    if (flickerOn) {
-      ctx.globalAlpha = 0.25 + 0.25 * pulse;
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
-      const w = W*0.055, h = H*0.01;
-      ctx.fillRect(cx - w/2, cy - H*0.07, w, h);
-    }
-
-    ctx.restore();
-  }
-
-  // ---- main loop ----
-  let t0 = performance.now();
-  let paused = false;
-
-  function reset() {
-    seed = (Math.random() * 1e9) | 0;
-  }
-
-  window.addEventListener('keydown', (e) => {
+  // Controls
+  var paused = false;
+  window.addEventListener('keydown', function(e){
     if (e.code === 'Space') paused = !paused;
-    if (e.key.toLowerCase() === 'r') reset();
+    if ((e.key || '').toLowerCase() === 'r') seed = (Math.random()*1e9)|0;
   });
-  window.addEventListener('click', reset);
+  window.addEventListener('click', function(){
+    seed = (Math.random()*1e9)|0;
+  });
 
-  function frame(now) {
-    requestAnimationFrame(frame);
+  // Main loop
+  var t0 = performance.now();
+
+  // One-time clear so first frame is visible
+  ctx.fillStyle = '#06060a';
+  ctx.fillRect(0,0,W,H);
+
+  console.log('[pizza_triangles] running');
+
+  function loop(now){
+    window.requestAnimationFrame(loop);
     if (paused) return;
 
-    const t = (now - t0) / 1000;
+    var t = (now - t0) / 1000;
+    var pulse = beatPulse(t);
 
-    // background fade
-    ctx.save();
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.fillStyle = 'rgba(5, 5, 7, 0.18)';
-    ctx.fillRect(0, 0, W, H);
-    ctx.restore();
+    // Solid-ish fade so drawings remain visible
+    ctx.fillStyle = 'rgba(6, 6, 10, 0.22)';
+    ctx.fillRect(0,0,W,H);
 
-    const pulse = beatPulse(t);
+    // Pizza “wheel”
+    var pcx = W*0.52;
+    var pcy = H*0.48;
+    var baseR = Math.min(W,H) * (0.24 + 0.04*Math.sin(t*0.7));
+    var slices = 8;
+    var spin = t*0.35;
 
-    // slight "open eye intermix": subtle jitter like perception instability
-    const jitter = 1.2 * (0.2 + 0.8 * pulse);
-    const jx = (rnd() - 0.5) * jitter * DPR;
-    const jy = (rnd() - 0.5) * jitter * DPR;
-
-    // pizza triangles cluster (sin/cos + exp decay feeling)
-    const centerX = W * 0.5 + jx;
-    const centerY = H * 0.52 + jy;
-
-    const layers = 8;
-    for (let i = 0; i < layers; i++) {
-      // exponential decay envelope: farther layers fade quicker
-      const env = Math.exp(-i * 0.35);
-      const baseR = (Math.min(W, H) * (0.08 + i * 0.03));
-      const wobble = 1 + 0.14 * Math.sin(t * (1.2 + i*0.07)) + 0.12 * Math.cos(t * (0.9 + i*0.09));
-      const r = baseR * wobble * (0.85 + 0.35 * pulse);
-
-      const slices = 6 + (i % 4);
-      const spin = t * (0.25 + i * 0.03) + 0.8 * Math.sin(t*0.6);
-      for (let s = 0; s < slices; s++) {
-        const a0 = spin + (s / slices) * Math.PI * 2;
-        const a1 = a0 + (Math.PI * 2 / slices) * (0.55 + 0.2 * Math.sin(t + s));
-        const blur = (8 + 10 * pulse) * (1 + i * 0.12);
-        const alpha = 0.07 * env + 0.08 * env * pulse;
-        drawPizzaTriangle(centerX, centerY, r, a0, a1, blur, alpha);
-      }
+    for (var s=0;s<slices;s++){
+      var aMid = spin + (s/slices)*Math.PI*2;
+      var wedge = (Math.PI*2 / slices) * 0.92;
+      var alpha = 0.55 + 0.25*pulse; // IMPORTANT: visible
+      drawPizzaSlice(pcx, pcy, baseR*(0.92 + 0.18*pulse), aMid, wedge, pulse, alpha);
     }
 
-    // dancing figures (cartoon-ish blobs) driven by sin/cos
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    for (const d of dancers) {
-      const x = (d.x0 + 0.03 * Math.sin(t*d.f1 + d.p) + 0.02 * Math.cos(t*0.7*d.f2 - d.p)) * W + jx;
-      const y = (d.y0 + 0.03 * Math.cos(t*d.f2 + d.p) + 0.02 * Math.sin(t*0.8*d.f1 - d.p)) * H + jy;
+    // Dancing triangles
+    for (var i=0;i<dancers.length;i++){
+      var d = dancers[i];
+      var sway = 0.035*Math.sin(t*d.sway + d.phase);
+      var hop  = 0.030*Math.abs(Math.sin(t*d.hop + d.phase));
+      var x = (d.x + sway) * W;
+      var y = (d.y - hop*(1.0+0.8*pulse)) * H;
+      var sz = d.size * (0.85 + 0.55*pulse);
 
-      const rr = d.r * (0.75 + 0.55 * pulse) * (0.8 + 0.2 * Math.sin(t + d.p));
-      const a = 0.04 + 0.08 * pulse;
-
-      ctx.globalAlpha = a;
-      ctx.shadowBlur = 12 + 18 * pulse;
-      ctx.shadowColor = 'rgba(180,255,220,0.35)';
-
-      ctx.strokeStyle = 'rgba(200, 255, 240, 0.12)';
-      ctx.lineWidth = Math.max(1, (1.5 + 2.5 * pulse) * DPR);
-
-      ctx.beginPath();
-      // “stick figure” that wiggles
-      ctx.moveTo(x, y - rr);
-      ctx.quadraticCurveTo(
-        x + rr * 0.6 * Math.sin(t*1.7 + d.p),
-        y,
-        x, y + rr
-      );
-      ctx.stroke();
-
-      // head blob
-      ctx.fillStyle = 'rgba(255,255,255,0.06)';
-      ctx.beginPath();
-      ctx.ellipse(x, y - rr, rr*0.35, rr*0.32, 0, 0, Math.PI*2);
-      ctx.fill();
+      // Make them pop
+      ctx.save();
+      ctx.globalAlpha = 0.55 + 0.35*pulse;
+      ctx.shadowBlur = (10 + 20*pulse) * DPR;
+      ctx.shadowColor = 'rgba(110, 220, 255, 0.65)';
+      drawDancer(x, y, sz, t, pulse, d.mood);
+      ctx.restore();
     }
-    ctx.restore();
-
-    // singer + headband flicker: toggles in a slightly irrational way
-    const flicker = (Math.sin(t*6.3) + Math.sin(t*9.7) + Math.sin(t*13.1)) > (1.15 - 0.9 * pulse);
-    drawSinger(t, flicker);
-
-    // a faint "math overlay" vibe: wave grid with decay
-    ctx.save();
-    ctx.globalAlpha = 0.05 + 0.08 * pulse;
-    ctx.strokeStyle = 'rgba(200, 220, 255, 0.20)';
-    ctx.lineWidth = 1 * DPR;
-    const step = Math.max(22, Math.min(W, H) / 26);
-    for (let y = 0; y < H; y += step) {
-      ctx.beginPath();
-      for (let x = 0; x <= W; x += 10 * DPR) {
-        const nx = x / W;
-        const ny = y / H;
-        const wave = Math.sin(2*Math.PI*(nx*2.0 + t*0.25)) +
-                     Math.cos(2*Math.PI*(ny*1.5 - t*0.18));
-        const decay = Math.exp(-Math.abs(ny - 0.55) * 3.0);
-        const yy = y + wave * 6 * decay * (0.6 + 0.8*pulse);
-        ctx.lineTo(x, yy);
-      }
-      ctx.stroke();
-    }
-    ctx.restore();
   }
 
-  requestAnimationFrame(frame);
-
-  // quick safety reality-check (quietly, without preaching)
-  // If someone experiences hallucinations that persist or feel scary, the smart move is
-  // to avoid driving and get medical advice. The canvas can wait.
+  window.requestAnimationFrame(loop);
 })();
 </script>
 </body>
