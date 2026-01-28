@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>THC Hallucinations Recreation</title>
+    <style>
+        body { margin: 0; background: black; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Set canvas to full screen
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        
+        // Colors for cartoon-like feel
+        const colors = ['#FF69B4', '#FFD700', '#00FF00', '#00BFFF', '#FF4500', '#9370DB'];
+        
+        // Parameters for animations
+        let time = 0;
+        const amplitude = 50; // For sine/cosine waves
+        const frequency = 0.05; // For music-like pulsing
+        const decayRate = 0.005; // Exponential decay for fading effects
+        
+        // Function to get random color
+        function getRandomColor() {
+            return colors[Math.floor(Math.random() * colors.length)];
+        }
+        
+        // Function to draw a blurry triangle (pizza-like slice)
+        function drawBlurryTriangle(x, y, size, angle, blur) {
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x + size * Math.cos(angle), y + size * Math.sin(angle));
+            ctx.lineTo(x + size * Math.cos(angle + Math.PI / 3), y + size * Math.sin(angle + Math.PI / 3)); // 60 degree slice
+            ctx.closePath();
+            
+            // Blurry borders using shadow
+            ctx.shadowColor = getRandomColor();
+            ctx.shadowBlur = blur;
+            ctx.fillStyle = getRandomColor();
+            ctx.fill();
+            
+            // Reset shadow
+            ctx.shadowBlur = 0;
+        }
+        
+        // Function to draw dancing figure (simple stick figure)
+        function drawDancingFigure(x, y, scale, phase) {
+            // Head
+            ctx.beginPath();
+            ctx.arc(x, y - 50 * scale, 20 * scale, 0, Math.PI * 2);
+            ctx.fillStyle = getRandomColor();
+            ctx.fill();
+            
+            // Body
+            ctx.beginPath();
+            ctx.moveTo(x, y - 30 * scale);
+            ctx.lineTo(x, y + 30 * scale);
+            ctx.strokeStyle = getRandomColor();
+            ctx.lineWidth = 5 * scale;
+            ctx.stroke();
+            
+            // Arms with sine wave movement
+            const armAngle = Math.sin(phase) * Math.PI / 4;
+            ctx.beginPath();
+            ctx.moveTo(x, y - 10 * scale);
+            ctx.lineTo(x - 40 * scale * Math.cos(armAngle), y + 40 * scale * Math.sin(armAngle));
+            ctx.moveTo(x, y - 10 * scale);
+            ctx.lineTo(x + 40 * scale * Math.cos(armAngle), y + 40 * scale * Math.sin(armAngle));
+            ctx.stroke();
+            
+            // Legs with cosine wave movement
+            const legAngle = Math.cos(phase) * Math.PI / 4;
+            ctx.beginPath();
+            ctx.moveTo(x, y + 30 * scale);
+            ctx.lineTo(x - 40 * scale * Math.cos(legAngle), y + 70 * scale * Math.sin(legAngle));
+            ctx.moveTo(x, y + 30 * scale);
+            ctx.lineTo(x + 40 * scale * Math.cos(legAngle), y + 70 * scale * Math.sin(legAngle));
+            ctx.stroke();
+        }
+        
+        // Function to simulate intermixing (fading in/out)
+        function exponentialDecay(alpha) {
+            return Math.exp(-decayRate * time) * alpha;
+        }
+        
+        // Animation loop
+        function animate() {
+            // Clear canvas with semi-transparent black for trailing effect (like closed-eye visuals)
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            time += 1;
+            
+            // Draw random dancing figures (cartoon scenes)
+            for (let i = 0; i < 5; i++) {
+                const x = Math.random() * canvas.width;
+                const y = Math.random() * canvas.height;
+                const scale = 0.5 + Math.sin(time * frequency + i) * 0.5;
+                const phase = time * frequency + i * Math.PI / 2;
+                drawDancingFigure(x, y, scale, phase);
+            }
+            
+            // Draw pizza-like triangles with blurry borders
+            for (let i = 0; i < 10; i++) {
+                const x = Math.random() * canvas.width;
+                const y = Math.random() * canvas.height;
+                const size = 50 + Math.cos(time * frequency + i) * amplitude;
+                const angle = time * frequency + i;
+                const blur = 10 + Math.sin(time * frequency + i) * 10; // Varying blur
+                drawBlurryTriangle(x, y, size, angle, blur);
+            }
+            
+            // Simulate open-eye intermix (random flashes, like headband illusion)
+            if (Math.random() < 0.1) {
+                ctx.fillStyle = `rgba(255, 255, 255, ${exponentialDecay(0.5)})`; // Fading white flash
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+            
+            requestAnimationFrame(animate);
+        }
+        
+        animate();
+        
+        // Handle resize
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,265 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Braun Hallucination (Canvas)</title>
+  <style>
+    html, body { margin:0; height:100%; background:#050507; overflow:hidden; }
+    canvas { display:block; width:100vw; height:100vh; }
+    .hint {
+      position: fixed; left: 12px; bottom: 12px;
+      font: 12px/1.2 system-ui, sans-serif; color: rgba(255,255,255,.65);
+      user-select: none;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <div class="hint">Space = pause • R = reset • Click = new seed</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+
+  let W = 0, H = 0, DPR = 1;
+  function resize() {
+    DPR = Math.min(2, window.devicePixelRatio || 1);
+    W = Math.floor(window.innerWidth * DPR);
+    H = Math.floor(window.innerHeight * DPR);
+    canvas.width = W;
+    canvas.height = H;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // ---- deterministic-ish randomness (seeded) ----
+  let seed = (Math.random() * 1e9) | 0;
+  function rnd() {
+    // xorshift32
+    seed ^= seed << 13; seed |= 0;
+    seed ^= seed >> 17; seed |= 0;
+    seed ^= seed << 5;  seed |= 0;
+    return ((seed >>> 0) / 4294967296);
+  }
+  function rand(a, b) { return a + (b - a) * rnd(); }
+
+  // ---- "music" without audio: beat + wobble ----
+  // A fake kick/snare feel: a beat phase and pulses with exponential decay.
+  const BPM = 118; // glam-ish. close enough.
+  const beatHz = BPM / 60;
+  function beatPulse(t) {
+    // pulse every beat, with exponential decay
+    const phase = (t * beatHz) % 1; // 0..1
+    const kick = Math.exp(-phase * 8.0);      // quick decay
+    const snare = Math.exp(-((phase - 0.5) * (phase - 0.5)) * 40.0); // mid hit
+    return 0.9 * kick + 0.6 * snare;
+  }
+
+  // ---- dancing "figures" (abstract blobs/lines) ----
+  const dancers = Array.from({length: 48}, () => ({
+    x0: rand(0.15, 0.85),
+    y0: rand(0.15, 0.85),
+    r:  rand(6, 22),
+    f1: rand(0.6, 2.2),
+    f2: rand(0.6, 2.2),
+    p:  rand(0, Math.PI * 2),
+  }));
+
+  // ---- pizza triangles ----
+  function drawPizzaTriangle(cx, cy, r, a0, a1, blur, alpha) {
+    ctx.save();
+    ctx.globalAlpha = alpha;
+
+    // blurry border feel
+    ctx.shadowBlur = blur;
+    ctx.shadowColor = 'rgba(255, 220, 150, 0.55)';
+
+    // gradient fill
+    const grad = ctx.createRadialGradient(cx, cy, r * 0.05, cx, cy, r);
+    grad.addColorStop(0, 'rgba(255, 220, 160, 0.95)');
+    grad.addColorStop(0.55, 'rgba(240, 160, 120, 0.75)');
+    grad.addColorStop(1, 'rgba(120, 60, 40, 0.15)');
+    ctx.fillStyle = grad;
+
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, r, a0, a1);
+    ctx.closePath();
+    ctx.fill();
+
+    // crust-ish edge
+    ctx.shadowBlur = blur * 0.6;
+    ctx.strokeStyle = 'rgba(255, 180, 90, 0.35)';
+    ctx.lineWidth = Math.max(1, r * 0.02);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  // ---- "singer" silhouette + headband flicker illusion ----
+  function drawSinger(t, flickerOn) {
+    const cx = W * 0.5;
+    const cy = H * 0.58;
+    const pulse = beatPulse(t);
+
+    ctx.save();
+    ctx.globalAlpha = 0.65;
+
+    // body
+    ctx.fillStyle = 'rgba(180, 180, 255, 0.10)';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + H*0.06, W*0.06*(1+0.05*pulse), H*0.12*(1+0.06*pulse), 0, 0, Math.PI*2);
+    ctx.fill();
+
+    // head
+    ctx.fillStyle = 'rgba(220, 220, 255, 0.12)';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy - H*0.05, W*0.03, H*0.04, 0, 0, Math.PI*2);
+    ctx.fill();
+
+    // hair blob
+    ctx.fillStyle = 'rgba(255, 180, 220, 0.10)';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy - H*0.065, W*0.042, H*0.05, 0.15*Math.sin(t*0.7), 0, Math.PI*2);
+    ctx.fill();
+
+    // the "headband" that isn't there
+    if (flickerOn) {
+      ctx.globalAlpha = 0.25 + 0.25 * pulse;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+      const w = W*0.055, h = H*0.01;
+      ctx.fillRect(cx - w/2, cy - H*0.07, w, h);
+    }
+
+    ctx.restore();
+  }
+
+  // ---- main loop ----
+  let t0 = performance.now();
+  let paused = false;
+
+  function reset() {
+    seed = (Math.random() * 1e9) | 0;
+  }
+
+  window.addEventListener('keydown', (e) => {
+    if (e.code === 'Space') paused = !paused;
+    if (e.key.toLowerCase() === 'r') reset();
+  });
+  window.addEventListener('click', reset);
+
+  function frame(now) {
+    requestAnimationFrame(frame);
+    if (paused) return;
+
+    const t = (now - t0) / 1000;
+
+    // background fade
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = 'rgba(5, 5, 7, 0.18)';
+    ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+
+    const pulse = beatPulse(t);
+
+    // slight "open eye intermix": subtle jitter like perception instability
+    const jitter = 1.2 * (0.2 + 0.8 * pulse);
+    const jx = (rnd() - 0.5) * jitter * DPR;
+    const jy = (rnd() - 0.5) * jitter * DPR;
+
+    // pizza triangles cluster (sin/cos + exp decay feeling)
+    const centerX = W * 0.5 + jx;
+    const centerY = H * 0.52 + jy;
+
+    const layers = 8;
+    for (let i = 0; i < layers; i++) {
+      // exponential decay envelope: farther layers fade quicker
+      const env = Math.exp(-i * 0.35);
+      const baseR = (Math.min(W, H) * (0.08 + i * 0.03));
+      const wobble = 1 + 0.14 * Math.sin(t * (1.2 + i*0.07)) + 0.12 * Math.cos(t * (0.9 + i*0.09));
+      const r = baseR * wobble * (0.85 + 0.35 * pulse);
+
+      const slices = 6 + (i % 4);
+      const spin = t * (0.25 + i * 0.03) + 0.8 * Math.sin(t*0.6);
+      for (let s = 0; s < slices; s++) {
+        const a0 = spin + (s / slices) * Math.PI * 2;
+        const a1 = a0 + (Math.PI * 2 / slices) * (0.55 + 0.2 * Math.sin(t + s));
+        const blur = (8 + 10 * pulse) * (1 + i * 0.12);
+        const alpha = 0.07 * env + 0.08 * env * pulse;
+        drawPizzaTriangle(centerX, centerY, r, a0, a1, blur, alpha);
+      }
+    }
+
+    // dancing figures (cartoon-ish blobs) driven by sin/cos
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (const d of dancers) {
+      const x = (d.x0 + 0.03 * Math.sin(t*d.f1 + d.p) + 0.02 * Math.cos(t*0.7*d.f2 - d.p)) * W + jx;
+      const y = (d.y0 + 0.03 * Math.cos(t*d.f2 + d.p) + 0.02 * Math.sin(t*0.8*d.f1 - d.p)) * H + jy;
+
+      const rr = d.r * (0.75 + 0.55 * pulse) * (0.8 + 0.2 * Math.sin(t + d.p));
+      const a = 0.04 + 0.08 * pulse;
+
+      ctx.globalAlpha = a;
+      ctx.shadowBlur = 12 + 18 * pulse;
+      ctx.shadowColor = 'rgba(180,255,220,0.35)';
+
+      ctx.strokeStyle = 'rgba(200, 255, 240, 0.12)';
+      ctx.lineWidth = Math.max(1, (1.5 + 2.5 * pulse) * DPR);
+
+      ctx.beginPath();
+      // “stick figure” that wiggles
+      ctx.moveTo(x, y - rr);
+      ctx.quadraticCurveTo(
+        x + rr * 0.6 * Math.sin(t*1.7 + d.p),
+        y,
+        x, y + rr
+      );
+      ctx.stroke();
+
+      // head blob
+      ctx.fillStyle = 'rgba(255,255,255,0.06)';
+      ctx.beginPath();
+      ctx.ellipse(x, y - rr, rr*0.35, rr*0.32, 0, 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.restore();
+
+    // singer + headband flicker: toggles in a slightly irrational way
+    const flicker = (Math.sin(t*6.3) + Math.sin(t*9.7) + Math.sin(t*13.1)) > (1.15 - 0.9 * pulse);
+    drawSinger(t, flicker);
+
+    // a faint "math overlay" vibe: wave grid with decay
+    ctx.save();
+    ctx.globalAlpha = 0.05 + 0.08 * pulse;
+    ctx.strokeStyle = 'rgba(200, 220, 255, 0.20)';
+    ctx.lineWidth = 1 * DPR;
+    const step = Math.max(22, Math.min(W, H) / 26);
+    for (let y = 0; y < H; y += step) {
+      ctx.beginPath();
+      for (let x = 0; x <= W; x += 10 * DPR) {
+        const nx = x / W;
+        const ny = y / H;
+        const wave = Math.sin(2*Math.PI*(nx*2.0 + t*0.25)) +
+                     Math.cos(2*Math.PI*(ny*1.5 - t*0.18));
+        const decay = Math.exp(-Math.abs(ny - 0.55) * 3.0);
+        const yy = y + wave * 6 * decay * (0.6 + 0.8*pulse);
+        ctx.lineTo(x, yy);
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  requestAnimationFrame(frame);
+
+  // quick safety reality-check (quietly, without preaching)
+  // If someone experiences hallucinations that persist or feel scary, the smart move is
+  // to avoid driving and get medical advice. The canvas can wait.
+})();
+</script>
+</body>
+</html>

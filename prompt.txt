@@ -1,0 +1,6 @@
+Mr. Braun  went to a 90s glam rock concert. He cosumed 20 mg of thc each before the concert, and he can feel it build up.
+The lights are off, the warm up band is playing. Mr. Braun closes his eyes and he sees shapes, figures dancing according to the music. Cartoon like scenes, no plot. 
+He sees the hallucinations intermixing with open eye vision as well, he notices that the singer's hair is sometimes perceived as a headband and sometimes not- she wasn't wearing a headband.
+Then, he closes his eyes and sees pizza like triangles, with blurry borders in the shape of the beat.
+Sinus, cosinus and exponential decay - Mr. Braun started coding and implementing what he sees in his minds eye.
+The show was over, Mr. Braun came back home - and recreated his hallucinations in javascript.

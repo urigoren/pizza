@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Concert Hallucinations - Mr. Braun's Recreation</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: #000;
+            overflow: hidden;
+            font-family: 'Courier New', monospace;
+        }
+        
+        canvas {
+            display: block;
+            background: linear-gradient(180deg, #000000 0%, #1a0a2e 100%);
+        }
+        
+        #controls {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+            color: #fff;
+            font-size: 14px;
+            z-index: 100;
+            border: 2px solid #ff006e;
+        }
+        
+        button {
+            background: linear-gradient(135deg, #ff006e 0%, #8338ec 100%);
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            border-radius: 5px;
+            font-weight: bold;
+            transition: transform 0.2s;
+        }
+        
+        button:hover {
+            transform: scale(1.05);
+        }
+        
+        button:active {
+            transform: scale(0.95);
+        }
+        
+        .slider-container {
+            margin: 10px 0;
+        }
+        
+        input[type="range"] {
+            width: 100%;
+        }
+        
+        label {
+            display: block;
+            margin-top: 10px;
+            color: #ff006e;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    
+    <div id="controls">
+        <h3 style="color: #ff006e; margin-bottom: 10px;">🎸 Concert Hallucinations 🎸</h3>
+        <button id="toggleAnimation">Pause Animation</button>
+        <button id="changeMode">Switch Mode</button>
+        
+        <div class="slider-container">
+            <label>Intensity: <span id="intensityValue">50</span>%</label>
+            <input type="range" id="intensity" min="0" max="100" value="50">
+        </div>
+        
+        <div class="slider-container">
+            <label>Speed: <span id="speedValue">1.0</span>x</label>
+            <input type="range" id="speed" min="10" max="200" value="100">
+        </div>
+        
+        <div class="slider-container">
+            <label>Blur: <span id="blurValue">5</span>px</label>
+            <input type="range" id="blur" min="0" max="20" value="5">
+        </div>
+        
+        <p style="margin-top: 15px; font-size: 11px; opacity: 0.7;">
+            Mode 1: Dancing Shapes<br>
+            Mode 2: Pizza Triangles<br>
+            Mode 3: Math Waves<br>
+            Mode 4: All Combined
+        </p>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Canvas setup
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+        
+        // Animation state
+        let time = 0;
+        let isAnimating = true;
+        let currentMode = 4; // 1: shapes, 2: pizza, 3: waves, 4: all
+        let intensity = 0.5;
+        let speedMultiplier = 1.0;
+        let blurAmount = 5;
+        
+        // Dancing cartoon figures
+        class DancingFigure {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.phase = Math.random() * Math.PI * 2;
+                this.speed = 0.5 + Math.random() * 1.5;
+                this.size = 30 + Math.random() * 50;
+                this.color = this.randomColor();
+                this.armSwing = Math.random() * Math.PI;
+            }
+            
+            randomColor() {
+                const colors = [
+                    'rgba(255, 0, 110, 0.7)',
+                    'rgba(131, 56, 236, 0.7)',
+                    'rgba(58, 134, 255, 0.7)',
+                    'rgba(252, 191, 73, 0.7)',
+                    'rgba(0, 255, 170, 0.7)'
+                ];
+                return colors[Math.floor(Math.random() * colors.length)];
+            }
+            
+            update(t) {
+                this.phase += this.speed * 0.05 * speedMultiplier;
+                this.y += Math.sin(this.phase) * 2;
+                this.armSwing = Math.sin(t * this.speed) * Math.PI / 4;
+            }
+            
+            draw(t) {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                
+                const bounce = Math.sin(t * this.speed * 2) * 10;
+                
+                // Body (oval)
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.ellipse(0, bounce, this.size * 0.4, this.size * 0.6, 0, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Head
+                ctx.beginPath();
+                ctx.arc(0, bounce - this.size * 0.8, this.size * 0.3, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Arms (swinging)
+                ctx.strokeStyle = this.color;
+                ctx.lineWidth = 5;
+                ctx.lineCap = 'round';
+                
+                // Left arm
+                ctx.beginPath();
+                ctx.moveTo(-this.size * 0.3, bounce - this.size * 0.2);
+                ctx.lineTo(-this.size * 0.6, bounce + Math.sin(this.armSwing) * 30);
+                ctx.stroke();
+                
+                // Right arm
+                ctx.beginPath();
+                ctx.moveTo(this.size * 0.3, bounce - this.size * 0.2);
+                ctx.lineTo(this.size * 0.6, bounce - Math.sin(this.armSwing) * 30);
+                ctx.stroke();
+                
+                ctx.restore();
+            }
+        }
+        
+        // Pizza triangles with blurry borders
+        class PizzaTriangle {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.rotation = Math.random() * Math.PI * 2;
+                this.rotationSpeed = (Math.random() - 0.5) * 0.02;
+                this.size = 40 + Math.random() * 80;
+                this.pulsePhase = Math.random() * Math.PI * 2;
+                this.color = `hsl(${Math.random() * 360}, 70%, 50%)`;
+            }
+            
+            update() {
+                this.rotation += this.rotationSpeed * speedMultiplier;
+                this.pulsePhase += 0.03 * speedMultiplier;
+            }
+            
+            draw(t) {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.rotation);
+                
+                const pulse = 1 + Math.sin(this.pulsePhase) * 0.2;
+                const currentSize = this.size * pulse;
+                
+                // Create blurry border effect
+                for (let i = 3; i > 0; i--) {
+                    ctx.globalAlpha = 0.2 / i;
+                    ctx.fillStyle = this.color;
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(0, -currentSize * (1 + i * 0.1));
+                    ctx.lineTo(-currentSize * 0.866 * (1 + i * 0.1), currentSize * 0.5 * (1 + i * 0.1));
+                    ctx.lineTo(currentSize * 0.866 * (1 + i * 0.1), currentSize * 0.5 * (1 + i * 0.1));
+                    ctx.closePath();
+                    ctx.fill();
+                }
+                
+                // Solid center
+                ctx.globalAlpha = 0.8;
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.moveTo(0, -currentSize);
+                ctx.lineTo(-currentSize * 0.866, currentSize * 0.5);
+                ctx.lineTo(currentSize * 0.866, currentSize * 0.5);
+                ctx.closePath();
+                ctx.fill();
+                
+                ctx.restore();
+            }
+        }
+        
+        // Mathematical wave patterns
+        class MathWave {
+            constructor(type, yOffset) {
+                this.type = type; // 'sin', 'cos', 'exp'
+                this.yOffset = yOffset;
+                this.phase = Math.random() * Math.PI * 2;
+                this.frequency = 0.01 + Math.random() * 0.02;
+                this.amplitude = 50 + Math.random() * 100;
+                this.color = this.getColor();
+            }
+            
+            getColor() {
+                if (this.type === 'sin') return 'rgba(255, 0, 110, 0.6)';
+                if (this.type === 'cos') return 'rgba(58, 134, 255, 0.6)';
+                return 'rgba(0, 255, 170, 0.6)';
+            }
+            
+            update() {
+                this.phase += 0.02 * speedMultiplier;
+            }
+            
+            draw(t) {
+                ctx.strokeStyle = this.color;
+                ctx.lineWidth = 3;
+                ctx.shadowBlur = blurAmount * 2;
+                ctx.shadowColor = this.color;
+                
+                ctx.beginPath();
+                
+                for (let x = 0; x < canvas.width; x += 2) {
+                    let y;
+                    
+                    if (this.type === 'sin') {
+                        y = this.yOffset + Math.sin(x * this.frequency + this.phase) * this.amplitude * intensity;
+                    } else if (this.type === 'cos') {
+                        y = this.yOffset + Math.cos(x * this.frequency + this.phase) * this.amplitude * intensity;
+                    } else { // exponential decay
+                        const decay = Math.exp(-x / (canvas.width * 0.5));
+                        y = this.yOffset + Math.sin(x * this.frequency * 2 + this.phase) * this.amplitude * decay * intensity;
+                    }
+                    
+                    if (x === 0) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                }
+                
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+            }
+        }
+        
+        // Initialize objects
+        let dancingFigures = [];
+        let pizzaTriangles = [];
+        let mathWaves = [];
+        
+        function initObjects() {
+            dancingFigures = [];
+            pizzaTriangles = [];
+            mathWaves = [];
+            
+            // Create dancing figures
+            for (let i = 0; i < 8; i++) {
+                dancingFigures.push(new DancingFigure(
+                    Math.random() * canvas.width,
+                    canvas.height * 0.3 + Math.random() * canvas.height * 0.4
+                ));
+            }
+            
+            // Create pizza triangles
+            for (let i = 0; i < 12; i++) {
+                pizzaTriangles.push(new PizzaTriangle(
+                    Math.random() * canvas.width,
+                    Math.random() * canvas.height
+                ));
+            }
+            
+            // Create math waves
+            mathWaves.push(new MathWave('sin', canvas.height * 0.3));
+            mathWaves.push(new MathWave('cos', canvas.height * 0.5));
+            mathWaves.push(new MathWave('exp', canvas.height * 0.7));
+        }
+        
+        initObjects();
+        
+        // Animation loop
+        function animate() {
+            if (!isAnimating) {
+                requestAnimationFrame(animate);
+                return;
+            }
+            
+            time += 0.016 * speedMultiplier;
+            
+            // Clear with fade effect
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Apply blur
+            ctx.filter = `blur(${blurAmount}px)`;
+            
+            // Draw based on mode
+            if (currentMode === 1 || currentMode === 4) {
+                // Dancing shapes
+                dancingFigures.forEach(figure => {
+                    figure.update(time);
+                    figure.draw(time);
+                });
+            }
+            
+            if (currentMode === 2 || currentMode === 4) {
+                // Pizza triangles
+                pizzaTriangles.forEach(triangle => {
+                    triangle.update();
+                    triangle.draw(time);
+                });
+            }
+            
+            ctx.filter = 'none';
+            
+            if (currentMode === 3 || currentMode === 4) {
+                // Math waves
+                mathWaves.forEach(wave => {
+                    wave.update();
+                    wave.draw(time);
+                });
+            }
+            
+            // Add some sparkles
+            if (Math.random() < 0.3 * intensity) {
+                ctx.fillStyle = `rgba(255, 255, 255, ${Math.random() * 0.8})`;
+                ctx.beginPath();
+                ctx.arc(
+                    Math.random() * canvas.width,
+                    Math.random() * canvas.height,
+                    Math.random() * 3,
+                    0,
+                    Math.PI * 2
+                );
+                ctx.fill();
+            }
+            
+            requestAnimationFrame(animate);
+        }
+        
+        // Controls
+        document.getElementById('toggleAnimation').addEventListener('click', (e) => {
+            isAnimating = !isAnimating;
+            e.target.textContent = isAnimating ? 'Pause Animation' : 'Resume Animation';
+        });
+        
+        document.getElementById('changeMode').addEventListener('click', () => {
+            currentMode = (currentMode % 4) + 1;
+        });
+        
+        document.getElementById('intensity').addEventListener('input', (e) => {
+            intensity = e.target.value / 100;
+            document.getElementById('intensityValue').textContent = e.target.value;
+        });
+        
+        document.getElementById('speed').addEventListener('input', (e) => {
+            speedMultiplier = e.target.value / 100;
+            document.getElementById('speedValue').textContent = (e.target.value / 100).toFixed(1);
+        });
+        
+        document.getElementById('blur').addEventListener('input', (e) => {
+            blurAmount = parseInt(e.target.value);
+            document.getElementById('blurValue').textContent = e.target.value;
+        });
+        
+        // Start animation
+        animate();
+    </script>
+</body>
+</html>
